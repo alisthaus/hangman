@@ -4,14 +4,13 @@ var util = require('util');
 var fs = require('fs');
 var url = require('url');
 
-var UseNewID;						// flag to determine if we have allocated a new ID
+var UseNewID = false;				// flag to determine if we have allocated a new ID
 var ContextID;						// context id  
-var ConetxtIDList = new Array();	// list of contexts
+var ContextIDList = new Array();	// list of contexts
 var MaxLives = 6;					// standard hangman limit of attempts (head, body, 2 arms, 2 legs)
 var GlobalID = 0;
 
 var WordList = ["RABBIT", "CAT", "DOG", "COW", "DEER", "POODLE", "HAT", "JAVASCRIPT", "NODE", "GIT", "GITHUB", "HEROKU", "ECLIPSE", "NODECLIPSE"];
-var AvailableLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 // logging levels
 var DEBUG="DEBUG";
@@ -25,6 +24,7 @@ fs.readFile('./hangman.html', function (err, html)
 {
 	if (err) 
 	{
+		log(ERROR, "Readfile failed")
 		throw err; 
 	}
 
@@ -32,11 +32,15 @@ fs.readFile('./hangman.html', function (err, html)
     {
 	    processPage(request, response, html, function() 
 	    {
+	    	var available_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	    	var letter_guessed = "";
+	    	var newgame = (request.post.newgame === "newgame");
 	    	UseNewID = false;
+	    	
+	    	    	
 	    	if(request.post.undo === "undo")	// undo button pressed
 	    	{
-	    		ContextID = ConetxtIDList[ContextID].prev_ContextID;
+	    		ContextID = ContextIDList[ContextID].prev_ContextID;
 	    			
 	    	}
 	    	else	
@@ -45,101 +49,85 @@ fs.readFile('./hangman.html', function (err, html)
 		    	letter_guessed = request.post.letter.toUpperCase();
 		    	
 				var ctx;	// context
-				// if no id or bogus id, start a new ctx
 				
-				if(letter_guessed.length > 0 && AvailableLetters.indexOf(letter_guessed >= 0) 	||
-						request.post.newgame === "newgame") 	// letter entered is valid alpha or newgame request
+				// if no letter guessed or non alpha guessed - ignore
+				// todo: client side html enhancement should restrict input to valid input
+				if((letter_guessed.length === 0 || available_letters.indexOf(letter_guessed) < 0) && !newgame)
 				{
-	
-					if(typeof(ContextID) === "undefined" 	||		// default behavior going to the URL 
-							  ContextID >= GlobalID	    ||		// user manually modified param to invalid value
-							  ContextID < 0				||		// user manually modified id to negative number
-							  isNaN(ContextID)				||		// user manually modified id to non numeric
-							  request.post.newgame === "newgame")					
-					{
+					redirect(request, response);
+					return;
+				}
+				
+				// if no id or bogus id, start a new context
+				if(typeof(ContextID) === "undefined"	||		// default behavior going to the URL w/o specifying an id
+						  ContextID >= GlobalID	    	||		// user manually modified param to invalid value
+						  ContextID < 0					||		// user manually modified id to negative number
+						  isNaN(ContextID)				||		// user manually modified id to non numeric
+						  newgame)								// newgame button pressed		
+				{
+				
+					ContextIDList.push(GlobalID);
+					ContextIDList[GlobalID] = new Context();
 					
-						ConetxtIDList.push(GlobalID);
-						ConetxtIDList[GlobalID] = new Context();
-						
-						if(ContextID < GlobalID)
-						{
-							ConetxtIDList[GlobalID].prev_ContextID = ContextID;
-						}
-						
-						ContextID = GlobalID;
-						
-						ConetxtIDList[GlobalID].letters_guessed = letter_guessed;
-						if(request.post.newgame === "newgame")
-						{
-							ConetxtIDList[GlobalID].current_word = WordList[Math.floor(Math.random() * WordList.length)]; // pick a random word from the list
-						}
-						else
-						{
-							ConetxtIDList[GlobalID].current_word = WordList[0];	// new sessions always start with rabbit which is the first word in the hangman dictionary for this game
-						}
-						if(ConetxtIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
-						{	
-							ConetxtIDList[GlobalID].guesses = 1;
-						}	
-						
-						ctx = ConetxtIDList[GlobalID];
-						UseNewID = true;	// redirect to new URL
-						GlobalID++;
-						
+					if(ContextID < GlobalID)
+					{
+						ContextIDList[GlobalID].prev_ContextID = ContextID;
 					}
 					
+					ContextID = GlobalID;
+					
+					ContextIDList[GlobalID].letters_guessed = letter_guessed;
+					if(newgame)
+					{
+						ContextIDList[GlobalID].current_word = WordList[Math.floor(Math.random() * WordList.length)]; // pick a random word from the list
+					}
 					else
 					{
-						ctx = ConetxtIDList[ContextID];
-						
-						if(letter_guessed.length > 0 &&
-						   AvailableLetters.indexOf(letter_guessed >= 0) &&	// letter entered is valid alpha
-						   ctx.letters_guessed.indexOf(letter_guessed) < 0)	// this letter was not already guessed
-						{
-							ConetxtIDList.push(GlobalID);
-							ConetxtIDList[GlobalID] = new Context();
-							ConetxtIDList[GlobalID].prev_ContextID = ContextID;
-							ConetxtIDList[GlobalID].guesses = ctx.guesses;					
-							ConetxtIDList[GlobalID].letters_guessed = ctx.letters_guessed+letter_guessed;	
-							ConetxtIDList[GlobalID].current_word = ctx.current_word;
-							
-							if(ConetxtIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
-							{	
-								ConetxtIDList[GlobalID].guesses++;
-							}	
-							UseNewID = true;	// redirect to new URL
-							GlobalID++;
-						}
+						ContextIDList[GlobalID].current_word = WordList[0];	// new sessions always start with rabbit which is the first word in the hangman dictionary for this game
 					}
-					log(DEBUG, "Printing ctx ID# " + ContextID);
-					log(DEBUG, ConetxtIDList[ContextID]);
-				
-					log(DEBUG, "id = " + Number(GlobalID-1));
-					log(DEBUG, ConetxtIDList[GlobalID-1]);
+					if(ContextIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
+					{	
+						ContextIDList[GlobalID].guesses = 1;
+					}	
+					
+					ctx = ContextIDList[GlobalID];
+					UseNewID = true;	// redirect to new URL
+					GlobalID++;
+					
 				}
-		}		
+				
+				else
+				{
+					ctx = ContextIDList[ContextID];
+					
+					if(letter_guessed.length > 0 &&
+					   available_letters.indexOf(letter_guessed >= 0) &&	// letter entered is valid alpha
+					   ctx.letters_guessed.indexOf(letter_guessed) < 0)	// this letter was not already guessed
+					{
+						ContextIDList.push(GlobalID);
+						ContextIDList[GlobalID] = new Context();
+						ContextIDList[GlobalID].prev_ContextID = ContextID;
+						ContextIDList[GlobalID].guesses = ctx.guesses;					
+						ContextIDList[GlobalID].letters_guessed = ctx.letters_guessed+letter_guessed;	
+						ContextIDList[GlobalID].current_word = ctx.current_word;
+						
+						if(ContextIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
+						{	
+							ContextIDList[GlobalID].guesses++;
+						}	
+						UseNewID = true;	// redirect to new URL
+						GlobalID++;
+					}
+				}
+				log(DEBUG, "Printing ctx ID# " + ContextID);
+				log(DEBUG, ContextIDList[ContextID]);
+			
+				log(DEBUG, "id = " + Number(GlobalID-1));
+				log(DEBUG, ContextIDList[GlobalID-1]);
+			
+	    	}		
+	    	redirect(request, response);
 		
-		var redirect_url;
-	    if(UseNewID) 
-	    {
-	    	redirect_url = "http://" + request.headers.host + "?id=" + Number(GlobalID-1);
-	    }
-	    else if(ContextID >= 0)
-	    {
-	    	redirect_url = "http://" + request.headers.host + "?id=" + ContextID;
-	    }
-	    else
-	    {
-	    	redirect_url = "http://" + request.headers.host;
-	    }
-	    log(DEBUG, redirect_url);
-	    	
-	    response.writeHead(301,
-			  {Location: redirect_url}
-			);
-	    response.end();
-	    
-	    
 	    });
     }).listen(process.env.PORT || 8081);	// when run locally, will run on port 8081.  Heroku hosting does not allow specifying a port and will always use port 80 
     
@@ -152,6 +140,29 @@ function Context()
 	this.letters_guessed 	= "";
 	this.current_word 		= "";
 	this.prev_ContextID 	= -1;
+}
+
+function redirect(request, response)
+{
+	var redirect_url;
+    if(UseNewID) 
+    {
+    	redirect_url = "http://" + request.headers.host + "?id=" + Number(GlobalID-1);
+    }
+    else if(ContextID >= 0)
+    {
+    	redirect_url = "http://" + request.headers.host + "?id=" + ContextID;
+    }
+    else
+    {
+    	redirect_url = "http://" + request.headers.host;
+    }
+    log(DEBUG, redirect_url);
+    	
+    response.writeHead(301,
+		  {Location: redirect_url}
+		);
+    response.end();	
 }
 
 function processPage(request, response, html, callback) {
@@ -195,9 +206,9 @@ function processPage(request, response, html, callback) {
     	
     	if(ContextID >= 0 && ContextID < GlobalID)	// valid game
     	{
-    		lives_remaining = MaxLives - ConetxtIDList[ContextID].guesses;
-    		letters_guessed = ConetxtIDList[ContextID].letters_guessed;
-    		current_word 	= ConetxtIDList[ContextID].current_word;
+    		lives_remaining = MaxLives - ContextIDList[ContextID].guesses;
+    		letters_guessed = ContextIDList[ContextID].letters_guessed;
+    		current_word 	= ContextIDList[ContextID].current_word;
     		
     		len = current_word.length;
     		
@@ -232,6 +243,7 @@ function processPage(request, response, html, callback) {
 			}	
     		
     	}
+    	
     	var html_str = String(html);
     	var message_str = "";
     	var guess_disabled_str = "";	// disables the guess button
