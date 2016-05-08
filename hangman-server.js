@@ -149,7 +149,7 @@ fs.readFile('./hangman.html', function (err, html)
 	    });
     
     
-    }).listen(8081, 'localhost');
+    }).listen(process.env.PORT || 8081);
     log("INFO", 'Hangman running at http://localhost:8081/');
 
 });
