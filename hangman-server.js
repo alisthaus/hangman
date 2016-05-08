@@ -1,6 +1,5 @@
 var http = require('http');
 var querystring = require('querystring');
-// var formidable = require("formidable");
 var util = require('util');
 var fs = require('fs');
 var url = require('url');
@@ -11,16 +10,16 @@ var ConetxtIDList = new Array();	// list of contexts
 var MaxLives = 6;					// standard hangman limit of attempts (head, body, 2 arms, 2 legs)
 var GlobalID = 0;
 
-var WordList = ["rabbit", "cat", "dog", "cow", "deer", "poodle", "hat", "javascript"];
-var AvailableLetters = "abcdefghijklmnopqrstuvwxyz";
+var WordList = ["RABBIT", "CAT", "DOG", "COW", "DEER", "POODLE", "HAT", "JAVASCRIPT", "NODE", "GIT", "GITHUB", "HEROKU", "ECLIPSE", "NODECLIPSE"];
+var AvailableLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 // logging levels
 var DEBUG="DEBUG";
 var INFO="INFO";
 var ERROR="ERROR";
 
-// var logLevel = DEBUG + "," + INFO;
-var logLevel = "";
+// var LogLevel = DEBUG + "," + INFO;
+var LogLevel = "";
 
 fs.readFile('./hangman.html', function (err, html)
 {
@@ -31,7 +30,6 @@ fs.readFile('./hangman.html', function (err, html)
 
     http.createServer(function handler(request, response) 
     {
-    
 	    processPage(request, response, html, function() 
 	    {
 	    	var letter_guessed = "";
@@ -44,7 +42,7 @@ fs.readFile('./hangman.html', function (err, html)
 	    	else	
 	    	{
 		    	log(DEBUG, "letter guessed= " + request.post.letter);
-		    	letter_guessed = request.post.letter.toLowerCase();
+		    	letter_guessed = request.post.letter.toUpperCase();
 		    	
 				var ctx;	// context
 				// if no id or bogus id, start a new ctx
@@ -61,34 +59,30 @@ fs.readFile('./hangman.html', function (err, html)
 					{
 					
 						ConetxtIDList.push(GlobalID);
-						ConetxtIDList[GlobalID] = new Object();
-						
-						ctx = new Object();
+						ConetxtIDList[GlobalID] = new Context();
 						
 						if(ContextID < GlobalID)
 						{
-							ctx.prev_ContextID = ContextID;
+							ConetxtIDList[GlobalID].prev_ContextID = ContextID;
 						}
-						else
-						{
-							ctx.prev_ContextID = -1;
-						}
+						
 						ContextID = GlobalID;
-						ctx.guesses = 0;	
-						ctx.letters_guessed = letter_guessed;
+						
+						ConetxtIDList[GlobalID].letters_guessed = letter_guessed;
 						if(request.post.newgame === "newgame")
 						{
-							ctx.current_word = WordList[Math.floor(Math.random() * WordList.length)]; // pick a word at random from the list
+							ConetxtIDList[GlobalID].current_word = WordList[Math.floor(Math.random() * WordList.length)]; // pick a random word from the list
 						}
 						else
 						{
-							ctx.current_word = WordList[0];	// new sessions always start with rabbit which is the first word in the hangman dictionary for this game
+							ConetxtIDList[GlobalID].current_word = WordList[0];	// new sessions always start with rabbit which is the first word in the hangman dictionary for this game
 						}
-						if(ctx.current_word.indexOf(letter_guessed) < 0) // letter not in word
+						if(ConetxtIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
 						{	
-							ctx.guesses = 1;
+							ConetxtIDList[GlobalID].guesses = 1;
 						}	
-						Object.assign(ConetxtIDList[GlobalID], ctx);
+						
+						ctx = ConetxtIDList[GlobalID];
 						UseNewID = true;	// redirect to new URL
 						GlobalID++;
 						
@@ -103,7 +97,7 @@ fs.readFile('./hangman.html', function (err, html)
 						   ctx.letters_guessed.indexOf(letter_guessed) < 0)	// this letter was not already guessed
 						{
 							ConetxtIDList.push(GlobalID);
-							ConetxtIDList[GlobalID] = new Object();
+							ConetxtIDList[GlobalID] = new Context();
 							ConetxtIDList[GlobalID].prev_ContextID = ContextID;
 							ConetxtIDList[GlobalID].guesses = ctx.guesses;					
 							ConetxtIDList[GlobalID].letters_guessed = ctx.letters_guessed+letter_guessed;	
@@ -147,16 +141,23 @@ fs.readFile('./hangman.html', function (err, html)
 	    
 	    
 	    });
+    }).listen(process.env.PORT || 8081);	// when run locally, will run on port 8081.  Heroku hosting does not allow specifying a port and will always use port 80 
     
-    
-    }).listen(process.env.PORT || 8081);
-    log("INFO", 'Hangman running at http://localhost:8081/');
 
 });
+
+function Context()
+{
+	this.guesses 			= 0;	
+	this.letters_guessed 	= "";
+	this.current_word 		= "";
+	this.prev_ContextID 	= -1;
+}
 
 function processPage(request, response, html, callback) {
     var queryData = "";
     var url_parts;
+    var current_word;
     
     if(typeof callback !== 'function') {
     	log(ERROR, "process page called with invalid callback function");
@@ -238,7 +239,7 @@ function processPage(request, response, html, callback) {
     	
     	if(solved)
 		{
-			message_str = "You solved the puzzle!"
+			message_str = "<b>You solved the puzzle!</b>"
 			
 		}
     	if(solved || lives_remaining === 0)
@@ -279,13 +280,13 @@ function processPage(request, response, html, callback) {
 
 function log(type, msg)
 {
-	if(logLevel.indexOf(type) >= 0 || type == ERROR)
+	if(LogLevel.indexOf(type) >= 0 || type === ERROR)
 	{
 		console.log(msg);
 	}
-	if(type == ERROR)
+	if(type === ERROR)
 	{
-		var stack = new Error().stack
-		console.log( stack )
+		var stack = new Error().stack;
+		console.log(stack);
 	}
 }
