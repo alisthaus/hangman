@@ -4,7 +4,7 @@
   "description": "hangman",
   "main": "hangman-server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified! Configure in package.json\" && exit 1"
+	  "start": "node hangman-server.js"
   },
   "repository": "",
   "keywords": [
@@ -15,4 +15,5 @@
   "author": "",
   "license": "MIT",
   "readmeFilename": "README.md"
+  
 }
