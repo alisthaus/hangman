@@ -105,7 +105,7 @@ fs.readFile('./hangman.html', function (err, html)
 					
 				}
 				
-				else
+				else	// process next guess
 				{
 					ctx = ContextIDList[ContextID];
 					
@@ -116,9 +116,9 @@ fs.readFile('./hangman.html', function (err, html)
 						
 						RandomString = randomString();
 						
-						ContextIDList.push(GlobalID);
 						ContextIDHash[RandomString] = GlobalID;
-						ContextIDList[GlobalID] = new Context();
+						ContextIDList[GlobalID] 	= new Context();
+						
 						ContextIDList[GlobalID].prev_context_id = ContextID;
 						ContextIDList[GlobalID].guesses = ctx.guesses;					
 						ContextIDList[GlobalID].letters_guessed = ctx.letters_guessed+letter_guessed;	
@@ -311,12 +311,12 @@ function processPage(request, response, html, callback) {
 }
 function randomString()
 {
-    var len = 16;	// length of random string
+    const RANDOMSTRINGLENGTH = 16;
     var outStr = "", newStr;
-    while (outStr.length < len)
+    while (outStr.length < RANDOMSTRINGLENGTH)
     {
         newStr = Math.random().toString(36).slice(2);
-        outStr += newStr.slice(0, Math.min(newStr.length, (len - outStr.length)));
+        outStr += newStr.slice(0, Math.min(newStr.length, (RANDOMSTRINGLENGTH - outStr.length)));
     }
     
     // verify that we have a unique random string
