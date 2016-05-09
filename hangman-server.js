@@ -1,11 +1,7 @@
 /*jshint esversion: 6 */
 var http = require('http');
-var querystring = require('querystring');
-var util = require('util');
-var fs = require('fs');
-var url = require('url');
+var fs 	 = require('fs');
 
-var UseNewID = false;				// flag to determine if we have allocated a new ID
 var ContextID;						// context id  
 var ContextIDList = new Array();	// list of contexts
 var ContextIDHash = new Array();	// list of 'hashes' to make urls arbitrary
@@ -15,18 +11,18 @@ var RandomString;					// index into GlobalIDHash
 
 var WordList = ["RABBIT", "CAT", "DOG", "COW", "DEER", "POODLE", "HAT", "JAVASCRIPT", "NODE", "GIT", "GITHUB", "HEROKU", "ECLIPSE", "NODECLIPSE"];
 
-
 // Constants
 const MAXLIVES = 6;					// standard hangman limit of attempts (head, body, 2 arms, 2 legs)
 
 // logging levels
-const DEBUG="DEBUG";
-const INFO="INFO";
-const ERROR="ERROR";
+const DEBUG = "DEBUG";
+const INFO 	= "INFO";
+const ERROR = "ERROR";
 
 // var LogLevel = DEBUG + "," + INFO;
 var LogLevel = "";
 
+// read the html template
 fs.readFile('./hangman.html', function (err, html)
 {
 	if (err) 
@@ -35,15 +31,16 @@ fs.readFile('./hangman.html', function (err, html)
 		throw err; 
 	}
 
+	// create the http server if possible on port 8081
     http.createServer(function handler(request, response) 
     {
-	    processPage(request, response, html, function() 
+	    // collect the form data and querystring variables.
+    	processPage(request, response, html, function() 
 	    {
 	    	var available_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	    	var letter_guessed = "";
 	    	var newgame = (request.post.newgame === "newgame");
-	    	UseNewID = false;
-	    	
+	    	var use_new_id = false;				// flag to determine if we have allocated a new ID
 	    	    	
 	    	if(request.post.undo === "undo")	// undo button pressed
 	    	{
@@ -64,7 +61,7 @@ fs.readFile('./hangman.html', function (err, html)
 				// todo: client side html enhancement should restrict input to valid input
 				if((letter_guessed.length === 0 || available_letters.indexOf(letter_guessed) < 0) && !newgame)
 				{
-					redirect(request, response);
+					redirect(request, response, use_new_id);
 					return;
 				}
 				
@@ -103,7 +100,7 @@ fs.readFile('./hangman.html', function (err, html)
 					}
 					
 					ctx = ContextIDList[GlobalID];
-					UseNewID = true;	// redirect to new URL
+					use_new_id = true;	// redirect to new URL
 					GlobalID++;
 					
 				}
@@ -132,7 +129,7 @@ fs.readFile('./hangman.html', function (err, html)
 						{	
 							ContextIDList[GlobalID].guesses++;
 						}	
-						UseNewID = true;	// redirect to new URL
+						use_new_id = true;	// redirect to new URL
 						GlobalID++;
 					}
 				}
@@ -143,7 +140,7 @@ fs.readFile('./hangman.html', function (err, html)
 				log(DEBUG, ContextIDList[GlobalID-1]);
 			
 	    	}		
-	    	redirect(request, response);
+	    	redirect(request, response, use_new_id);
 		
 	    });
     }).listen(process.env.PORT || 8081);	// when run locally, will run on port 8081.  Heroku hosting does not allow specifying a port and will always use port 80 
@@ -160,10 +157,10 @@ function Context()
 	this.random_string		= "";
 }
 
-function redirect(request, response)
+function redirect(request, response, use_new_id)
 {
 	var redirect_url;
-    if(UseNewID) 
+    if(use_new_id) 
     {
     	redirect_url = "http://" + request.headers.host + "?id=" + RandomString;
     }
@@ -184,6 +181,7 @@ function redirect(request, response)
 }
 
 function processPage(request, response, html, callback) {
+	var querystring = require('querystring');
     var queryData = "";
     var url_parts;
     var current_word;
@@ -237,13 +235,13 @@ function processPage(request, response, html, callback) {
     			{
     				if(current_word[i] === letters_guessed[j])
     				{
-    					letter_str += letters_guessed[j];
+    					letter_str += letters_guessed[j] + "  ";
     					break;
     				}
     			}
     			if(j == letters_guessed.length)
     			{
-    				letter_str += '_';
+    				letter_str += "__ ";
     				solved = false;
     			}
     		}
@@ -257,7 +255,7 @@ function processPage(request, response, html, callback) {
     		len = current_word.length;
     		for(var i=0; i<len; i++)
     		{
-				letter_str += '_';
+				letter_str += "__ ";
 				solved = false;
 			}	
     		
