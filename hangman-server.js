@@ -20,7 +20,7 @@ var INFO="INFO";
 var ERROR="ERROR";
 
 // var LogLevel = DEBUG + "," + INFO;
-var LogLevel = "DEBUG";
+var LogLevel = "";
 
 fs.readFile('./hangman.html', function (err, html)
 {
@@ -73,6 +73,7 @@ fs.readFile('./hangman.html', function (err, html)
 					ContextIDList[GlobalID] = new Context();
 					
 					RandomString = randomString();
+															
 					ContextIDHash[RandomString] = GlobalID;
 					ContextIDList[GlobalID].random_string = RandomString;
 					
@@ -111,8 +112,9 @@ fs.readFile('./hangman.html', function (err, html)
 					   available_letters.indexOf(letter_guessed >= 0) &&	// letter entered is valid alpha
 					   ctx.letters_guessed.indexOf(letter_guessed) < 0)	// this letter was not already guessed
 					{
+						
 						RandomString = randomString();
-
+						
 						ContextIDList.push(GlobalID);
 						ContextIDHash[RandomString] = GlobalID;
 						ContextIDList[GlobalID] = new Context();
@@ -311,6 +313,14 @@ function randomString()
         newStr = Math.random().toString(36).slice(2);
         outStr += newStr.slice(0, Math.min(newStr.length, (len - outStr.length)));
     }
+    
+    // verify that we have a unique random string
+    if(typeof(ContextIDHash[outStr]) !== "undefined")
+	{
+		log(DEBUG, "ranndomString returned a duplicate hash of: " + outStr);
+		outStr += Number(GlobalID);
+		log(DEBUG, "modifying to unique sting: " + outStr);
+	}
     log(DEBUG, "randomString() returning: "+ outStr);
     return outStr;
 }
