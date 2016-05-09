@@ -63,13 +63,9 @@ fs.readFile('./hangman.html', function (err, html)
 				
 				// if no id or bogus id, start a new context
 				if(typeof(ContextID) === "undefined"	||		// default behavior going to the URL w/o specifying an id
-						  ContextID >= GlobalID	    	||		// user manually modified param to invalid value
-						  ContextID < 0					||		// user manually modified id to negative number
-						  isNaN(ContextID)				||		// user manually modified id to non numeric
 						  newgame)								// newgame button pressed		
 				{
 				
-					ContextIDList.push(GlobalID);
 					ContextIDList[GlobalID] = new Context();
 					
 					RandomString = randomString();
