@@ -1,3 +1,4 @@
+/*jshint esversion: 6 */
 var http = require('http');
 var querystring = require('querystring');
 var util = require('util');
@@ -7,17 +8,21 @@ var url = require('url');
 var UseNewID = false;				// flag to determine if we have allocated a new ID
 var ContextID;						// context id  
 var ContextIDList = new Array();	// list of contexts
-var ContextIDHash = new Array();
-var MaxLives = 6;					// standard hangman limit of attempts (head, body, 2 arms, 2 legs)
-var GlobalID = 0;
-var RandomString;
+var ContextIDHash = new Array();	// list of 'hashes' to make urls arbitrary
+
+var GlobalID = 0;					// index into GlobalIDList
+var RandomString;					// index into GlobalIDHash
 
 var WordList = ["RABBIT", "CAT", "DOG", "COW", "DEER", "POODLE", "HAT", "JAVASCRIPT", "NODE", "GIT", "GITHUB", "HEROKU", "ECLIPSE", "NODECLIPSE"];
 
+
+// Constants
+const MAXLIVES = 6;					// standard hangman limit of attempts (head, body, 2 arms, 2 legs)
+
 // logging levels
-var DEBUG="DEBUG";
-var INFO="INFO";
-var ERROR="ERROR";
+const DEBUG="DEBUG";
+const INFO="INFO";
+const ERROR="ERROR";
 
 // var LogLevel = DEBUG + "," + INFO;
 var LogLevel = "";
@@ -42,15 +47,17 @@ fs.readFile('./hangman.html', function (err, html)
 	    	    	
 	    	if(request.post.undo === "undo")	// undo button pressed
 	    	{
-	    		ContextID = ContextIDList[ContextID].prev_ContextID;
+	    		ContextID = ContextIDList[ContextID].prev_context_id;
 	    		RandomString = ContextID.random_string;
 	    			
 	    	}
 	    	else	
 	    	{
-		    	log(DEBUG, "letter guessed= " + request.post.letter);
-		    	letter_guessed = request.post.letter.toUpperCase();
-		    	
+		    	if(!newgame)
+		    	{
+		    		log(DEBUG, "letter guessed= " + request.post.letter);
+		    		letter_guessed = request.post.letter.toUpperCase();
+		    	}
 				var ctx;	// context
 				
 				// if no letter guessed or non alpha guessed - ignore
@@ -62,7 +69,7 @@ fs.readFile('./hangman.html', function (err, html)
 				}
 				
 				// if no id or bogus id, start a new context
-				if(typeof(ContextID) === "undefined"	||		// default behavior going to the URL w/o specifying an id
+				if(typeof(ContextID) === "undefined"	||		// default behavior going to the URL w/o specifying an id or specifying an invalid id
 						  newgame)								// newgame button pressed		
 				{
 				
@@ -75,24 +82,25 @@ fs.readFile('./hangman.html', function (err, html)
 					
 					if(ContextID < GlobalID)
 					{
-						ContextIDList[GlobalID].prev_ContextID = ContextID;
+						ContextIDList[GlobalID].prev_context_id = ContextID;
 					}
 					
 					ContextID = GlobalID;
 					
-					ContextIDList[GlobalID].letters_guessed = letter_guessed;
+					
 					if(newgame)
 					{
 						ContextIDList[GlobalID].current_word = WordList[Math.floor(Math.random() * WordList.length)]; // pick a random word from the list
 					}
 					else
 					{
+						ContextIDList[GlobalID].letters_guessed = letter_guessed;
 						ContextIDList[GlobalID].current_word = WordList[0];	// new sessions always start with rabbit which is the first word in the hangman dictionary for this game
+						if(ContextIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
+						{	
+							ContextIDList[GlobalID].guesses = 1;
+						}	
 					}
-					if(ContextIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
-					{	
-						ContextIDList[GlobalID].guesses = 1;
-					}	
 					
 					ctx = ContextIDList[GlobalID];
 					UseNewID = true;	// redirect to new URL
@@ -114,7 +122,7 @@ fs.readFile('./hangman.html', function (err, html)
 						ContextIDList.push(GlobalID);
 						ContextIDHash[RandomString] = GlobalID;
 						ContextIDList[GlobalID] = new Context();
-						ContextIDList[GlobalID].prev_ContextID = ContextID;
+						ContextIDList[GlobalID].prev_context_id = ContextID;
 						ContextIDList[GlobalID].guesses = ctx.guesses;					
 						ContextIDList[GlobalID].letters_guessed = ctx.letters_guessed+letter_guessed;	
 						ContextIDList[GlobalID].current_word = ctx.current_word;
@@ -148,7 +156,7 @@ function Context()
 	this.guesses 			= 0;	
 	this.letters_guessed 	= "";
 	this.current_word 		= "";
-	this.prev_ContextID 	= -1;
+	this.prev_context_id 	= -1;
 	this.random_string		= "";
 }
 
@@ -209,7 +217,7 @@ function processPage(request, response, html, callback) {
     } 
     else 
     {
-       	var lives_remaining = MaxLives;
+       	var lives_remaining = MAXLIVES;
     	var letters_guessed = "";
     	var len;
     	var letter_str = "";
@@ -217,7 +225,7 @@ function processPage(request, response, html, callback) {
     	
     	if(ContextID >= 0 && ContextID < GlobalID)	// valid game
     	{
-    		lives_remaining = MaxLives - ContextIDList[ContextID].guesses;
+    		lives_remaining = MAXLIVES - ContextIDList[ContextID].guesses;
     		letters_guessed = ContextIDList[ContextID].letters_guessed;
     		current_word 	= ContextIDList[ContextID].current_word;
     		
@@ -242,7 +250,7 @@ function processPage(request, response, html, callback) {
     	}
     	else
     	{
-    		lives_remaining = MaxLives;
+    		lives_remaining = MAXLIVES;
     		letters_guessed = "";
     		current_word = WordList[0];	// new sessions always start with rabbit which is the first word in the hangman dictionary for this game
 			    		
@@ -257,6 +265,7 @@ function processPage(request, response, html, callback) {
     	
     	var html_str = String(html);
     	var message_str = "";
+    	var input_disabled_str = "";	// disables the input text box
     	var guess_disabled_str = "";	// disables the guess button
     	var undo_disabled_str = "";		// disabled the undo button
     	
@@ -268,6 +277,7 @@ function processPage(request, response, html, callback) {
     	if(solved || lives_remaining === 0)
     	{
     		guess_disabled_str = "disabled";
+    		input_disabled_str = "disabled";
     	}
     	
     	if(lives_remaining === 0)
@@ -282,6 +292,7 @@ function processPage(request, response, html, callback) {
     	
         	
     	log(DEBUG, letter_str);
+    	html_str = html_str.replace("{{INPUT-DISABLED}}", 	input_disabled_str);
     	html_str = html_str.replace("{{LETTERS}}", 			letter_str);
     	html_str = html_str.replace("{{LIVES}}", 			lives_remaining);
     	html_str = html_str.replace("{{MESSAGE}}", 			message_str);
