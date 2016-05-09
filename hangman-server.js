@@ -7,8 +7,10 @@ var url = require('url');
 var UseNewID = false;				// flag to determine if we have allocated a new ID
 var ContextID;						// context id  
 var ContextIDList = new Array();	// list of contexts
+var ContextIDHash = new Array();
 var MaxLives = 6;					// standard hangman limit of attempts (head, body, 2 arms, 2 legs)
 var GlobalID = 0;
+var RandomString;
 
 var WordList = ["RABBIT", "CAT", "DOG", "COW", "DEER", "POODLE", "HAT", "JAVASCRIPT", "NODE", "GIT", "GITHUB", "HEROKU", "ECLIPSE", "NODECLIPSE"];
 
@@ -18,7 +20,7 @@ var INFO="INFO";
 var ERROR="ERROR";
 
 // var LogLevel = DEBUG + "," + INFO;
-var LogLevel = "";
+var LogLevel = "DEBUG";
 
 fs.readFile('./hangman.html', function (err, html)
 {
@@ -41,6 +43,7 @@ fs.readFile('./hangman.html', function (err, html)
 	    	if(request.post.undo === "undo")	// undo button pressed
 	    	{
 	    		ContextID = ContextIDList[ContextID].prev_ContextID;
+	    		RandomString = ContextID.random_string;
 	    			
 	    	}
 	    	else	
@@ -68,6 +71,10 @@ fs.readFile('./hangman.html', function (err, html)
 				
 					ContextIDList.push(GlobalID);
 					ContextIDList[GlobalID] = new Context();
+					
+					RandomString = randomString();
+					ContextIDHash[RandomString] = GlobalID;
+					ContextIDList[GlobalID].random_string = RandomString;
 					
 					if(ContextID < GlobalID)
 					{
@@ -104,12 +111,16 @@ fs.readFile('./hangman.html', function (err, html)
 					   available_letters.indexOf(letter_guessed >= 0) &&	// letter entered is valid alpha
 					   ctx.letters_guessed.indexOf(letter_guessed) < 0)	// this letter was not already guessed
 					{
+						RandomString = randomString();
+
 						ContextIDList.push(GlobalID);
+						ContextIDHash[RandomString] = GlobalID;
 						ContextIDList[GlobalID] = new Context();
 						ContextIDList[GlobalID].prev_ContextID = ContextID;
 						ContextIDList[GlobalID].guesses = ctx.guesses;					
 						ContextIDList[GlobalID].letters_guessed = ctx.letters_guessed+letter_guessed;	
 						ContextIDList[GlobalID].current_word = ctx.current_word;
+						ContextIDList[GlobalID].random_string = RandomString;
 						
 						if(ContextIDList[GlobalID].current_word.indexOf(letter_guessed) < 0) // letter not in word
 						{	
@@ -140,6 +151,7 @@ function Context()
 	this.letters_guessed 	= "";
 	this.current_word 		= "";
 	this.prev_ContextID 	= -1;
+	this.random_string		= "";
 }
 
 function redirect(request, response)
@@ -147,11 +159,11 @@ function redirect(request, response)
 	var redirect_url;
     if(UseNewID) 
     {
-    	redirect_url = "http://" + request.headers.host + "?id=" + Number(GlobalID-1);
+    	redirect_url = "http://" + request.headers.host + "?id=" + RandomString;
     }
     else if(ContextID >= 0)
     {
-    	redirect_url = "http://" + request.headers.host + "?id=" + ContextID;
+    	redirect_url = "http://" + request.headers.host + "?id=" + ContextIDList[ContextID].random_string;
     }
     else
     {
@@ -178,7 +190,8 @@ function processPage(request, response, html, callback) {
     log(DEBUG, "processPage: " + request.method);
     
     url_parts = querystring.parse(request.url.replace(/^.*\?/, ''));
-	ContextID = url_parts.id;
+	RandomString = url_parts.id;
+	ContextID = ContextIDHash[RandomString];
 
 	log(DEBUG, url_parts);
 	log(DEBUG, "ContextID= " + ContextID);
@@ -288,6 +301,18 @@ function processPage(request, response, html, callback) {
     	response.write(html_str); 
     	response.end();
     }
+}
+function randomString()
+{
+    var len = 16;	// length of random string
+    var outStr = "", newStr;
+    while (outStr.length < len)
+    {
+        newStr = Math.random().toString(36).slice(2);
+        outStr += newStr.slice(0, Math.min(newStr.length, (len - outStr.length)));
+    }
+    log(DEBUG, "randomString() returning: "+ outStr);
+    return outStr;
 }
 
 function log(type, msg)
